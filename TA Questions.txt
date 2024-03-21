@@ -1,0 +1,1 @@
+Does the serialtester work for MPI programs too?

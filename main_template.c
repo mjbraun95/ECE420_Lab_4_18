@@ -26,7 +26,6 @@ int main (int argc, char* argv[]){
     FILE *ip;
     /* INSTANTIATE MORE VARIABLES IF NECESSARY */
 
-    printf("Line 29\n");
     // load data 
     if ((ip = fopen("data_input_meta","r")) == NULL) {
         printf("Error opening the data_input_meta file.\n");
@@ -40,15 +39,12 @@ int main (int argc, char* argv[]){
     r = malloc(nodecount * sizeof(double));
     r_pre = malloc(nodecount * sizeof(double));
     
-    printf("Line 43\n");
     GET_TIME(start);
     iterationcount = 0;
     for ( i = 0; i < nodecount; ++i)
         r[i] = 1.0 / nodecount;
     /* INITIALIZE MORE VARIABLES IF NECESSARY */
 
-    printf("Line 50\n");
-    // core calculation
     // Core calculation
     do {
         vec_cp(r, r_pre, nodecount); // Copy current PageRank scores to r_pre
@@ -65,12 +61,10 @@ int main (int argc, char* argv[]){
         ++iterationcount;
     } while (rel_error(r, r_pre, nodecount) >= EPSILON);
     GET_TIME(end);
-    printf("Line 58\n");
 
     Lab4_saveoutput(r, nodecount, end - start);
 
     // post processing
-    printf("Line 63\n");
     node_destroy(nodehead, nodecount);
     free(r); free(r_pre);
     return 0;

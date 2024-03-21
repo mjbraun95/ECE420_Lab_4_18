@@ -58,8 +58,9 @@ ignore_patterns = [
     r'\.png', # Ignore .png files
     r'\.jpg', # Ignore .jpg files
     r'\.jpeg', # Ignore .jpeg files
-    r'data_input_link|data_input_meta|serialtester',
+    r'data_input_link|data_input_meta|serialtester|data_output',
     r'\.txt', # Ignore .txt files
+    r'\.sh', # Ignore .sh files
 
     # Add more patterns as needed
 ]
