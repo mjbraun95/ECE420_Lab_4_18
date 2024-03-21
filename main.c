@@ -51,12 +51,19 @@ int main(int argc, char* argv[]){
     r_pre = (double*)malloc(nodecount * sizeof(double));
     r_global = (double*)malloc(nodecount * sizeof(double));
 
+    // Before the loop where you calculate PageRank
+    int nodes_per_process = nodecount / world_size;
+    int remainder = nodecount % world_size;
+
+    local_start = world_rank * nodes_per_process + (world_rank < remainder ? world_rank : remainder);
+    local_end = local_start + nodes_per_process + (world_rank < remainder);
+
     // Initialize PageRank values
     for (i = 0; i < nodecount; ++i) r[i] = 1.0 / nodecount;
 
     // Determine local work range
-    local_start = world_rank * (nodecount / world_size);
-    local_end = (world_rank + 1) * (nodecount / world_size);
+    // local_start = world_rank * (nodecount / world_size);
+    // local_end = (world_rank + 1) * (nodecount / world_size);
     if (world_rank == world_size - 1) local_end = nodecount; // Last process
 
     GET_TIME(start);
