@@ -1,0 +1,495 @@
+-------------------------------------------------------------------------------------------------------|
+datatrim.c:
+/*
+The script to fetch the subset of the original data and add links to the node with no out going links The index is remapped to make it continuous in the resulting subset of data. Index start from 0.
+
+As for the output file, first line is the number of the included nodes, the following lines indicating the directed links with the first number as the index of the source node and the second number as the index of the destination node.
+
+-----
+Compiling:
+    > gcc datatrim.c -o datatrim
+
+-----
+Synopsis:
+    datatrim [-bion]
+
+-----
+Options:
+    -b    specify the upper bound index to be included in the original data (default 5300, generating data with 1112 nodes)
+    -i    specify the input path (default "./web-Stanford.txt")
+    -o    specify the output path prefix (default "./data_input") 
+    -n    tag to shut down the auto link addition for the nodes that have no out going links
+
+-----
+Outputs:
+    Output files:
+    data_input_link:    the directed links with the first number as the index of the source node and the second number as the index of the destination node.
+    data_input_meta:    first line indicating the number of the nodes, the following lines indicating the node index, number of incoming links, number of outgoing links. 
+
+-----
+Error returns:
+    -1    unexpected options
+    -2    fail to open files 
+    1     upper bound (-b) too small
+
+-----
+Example:
+    >datatrim
+    fetch the graph from the original, add links for the nodes with no out going links and store the result in "./data_input", 
+   
+    >datagen -b 10000 -n
+    fetch the graph with index less than 10000 and store it in "data_input"
+
+Source data is from:
+http://snap.stanford.edu/data/web-Stanford.html
+*/
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+
+int main (int argc, char* argv[]){
+    int option;
+    int b_extend = 1;
+    char *INPATH = "web-Stanford.txt";
+    char *OUTPATH = "data_input";
+    int BOUND = 5300, src, dst;
+    FILE *fp_ori, *fp_dest;
+    int *flag, *num_out_links, *num_in_links;
+    int Ecount = 0;
+    int Ncount = 0;
+    int Noncount = 0;
+    int i,j;
+    char* tempstore;
+    char outpath_link[100], outpath_meta[100];
+
+    while ((option = getopt(argc, argv, "b:i:o:n")) != -1)
+        switch(option){
+            case 'b': BOUND = strtol(optarg, NULL, 10); break;
+            case 'i': INPATH = optarg; break;
+            case 'o': OUTPATH = optarg; break;
+            case 'n': b_extend = 0; break;
+            case '?': return -1;
+        }
+    if ((fp_ori = fopen(INPATH,"r")) == NULL){
+        printf("Fail to open the source data file. \n");
+        return -2;
+    } 
+    strcpy(outpath_link, OUTPATH);
+    strcat(outpath_link, "_link");
+    strcpy(outpath_meta, OUTPATH);
+    strcat(outpath_meta, "_meta");
+
+    flag = malloc(BOUND*sizeof(int));
+    tempstore = malloc(100*sizeof(char));
+
+    // find out with nodes are engaged with the current bound
+    for (i = 0; i < BOUND; ++i)
+        flag[i] = 0;     
+    for (j = 0; j < 4; ++j){ // ignore the firt few lines
+        fgets(tempstore, 100, fp_ori);
+    }
+    while(!feof(fp_ori)){
+        fscanf(fp_ori, "%d\t%d\n", &src, &dst);
+        if (src < BOUND && dst < BOUND){
+            ++Ecount;
+            flag[src] = 1;
+            flag[dst] = 1;
+        }
+    }
+    for (i = 0; i < BOUND; ++i)
+        Ncount+=flag[i];
+    if (Ncount == 0){
+        printf("Upper limit too small and no nodes are engaged. Try larger upper bound. \n");
+        exit(1);
+    }
+    // remap the node index 
+    j=0;
+    if (BOUND == 1)
+        --flag[0];
+    else{
+        for (i = 0; i< BOUND; ++i)
+            if (flag[i]){
+                flag[i] = j++;
+            }else{
+                flag[i] = -1; //tag to indicate that the current edge is not engaged.
+            }
+    }
+    // Get the new link file and save the output to data_input_link
+    rewind(fp_ori);   
+    for (j = 0; j < 4; ++j){// ignore the first few lines
+        fgets(tempstore, 100, fp_ori);
+    }
+    free(tempstore);
+    if ((fp_dest = fopen(outpath_link,"w")) == NULL){
+        printf("Fail to open the output file %s. \n", outpath_link);
+        return -2;
+    }
+    if (b_extend){ 
+        num_out_links = malloc(Ncount * sizeof(int));
+        for (i = 0; i < Ncount; ++i) num_out_links[i] = 0;
+    }
+    while(!feof(fp_ori)){
+        fscanf(fp_ori, "%d\t%d\n", &src, &dst);
+        if (src < BOUND && dst < BOUND){
+            fprintf(fp_dest, "%d\t%d\n", flag[src], flag[dst]);
+            if (b_extend) ++num_out_links[flag[src]];
+        }
+    }
+    if (b_extend){
+        for (i = 0; i < Ncount; ++i)
+            if (num_out_links[i] == 0){
+                ++Noncount;
+                for (j = 0; j < BOUND; ++j)
+                    if (flag[j] >= 0)
+                        fprintf(fp_dest, "%d\t%d\n", i, flag[j]);
+            }
+        free(num_out_links);   
+    }
+    fclose(fp_dest);
+    fclose(fp_ori);
+    // Deal with the meta data
+    if ((fp_ori = fopen(outpath_link,"r")) == NULL) {
+        printf("Error opening the link file: %s.\n", outpath_link);
+        return -2;
+    }
+    num_in_links = malloc(Ncount * sizeof(int)); 
+    num_out_links = malloc(Ncount * sizeof(int)); 
+    for (i = 0; i < Ncount; ++i){
+        num_in_links[i] = 0;
+        num_out_links[i] = 0;
+    }
+    while(!feof(fp_ori)){
+        fscanf(fp_ori, "%d\t%d\n", &src, &dst); 
+        ++num_in_links[dst]; ++num_out_links[src];
+    } 
+    fclose(fp_ori);
+    // Save the meta data into data_input_meta
+    if ((fp_dest = fopen(outpath_meta,"w")) == NULL){
+        printf("Fail to open the output file %s. \n", outpath_meta);
+        return -2;
+    }
+    fprintf(fp_dest, "%d\n", Ncount);
+    for (i=0; i<Ncount; ++i){
+        fprintf(fp_dest, "%d\t%d\t%d\n", i, num_in_links[i], num_out_links[i]);
+    }
+    fclose(fp_dest);
+    free(num_in_links); free(num_out_links);
+    // Display the output
+    if (b_extend){
+        Ecount += Ncount * Noncount;
+        printf("There are %d nodes and %d edges in the sub dataset including the added edges for the nodes with no outgoing links. \n", Ncount, Ecount);
+    }
+    else
+        printf("There are %d nodes and %d edges in the sub dataset. \n", Ncount, Ecount);
+
+    // clean up
+    free(flag);
+    return 0;
+}
+
+
+-------------------------------------------------------------------------------------------------------|
+Lab4_IO.c:
+#define LAB4_EXTEND
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include "Lab4_IO.h"
+
+int Lab4_saveoutput(double *R, int nodecount, double Time){
+/*
+    Save the data to file for Lab 4
+
+    -----
+    Input:
+    int *R         pointer to the result array
+    int nodecount  number of nodes
+    double Time    measured calculation time
+
+    -----
+    Output:
+    data_output the stored data
+
+    -----
+    Example:
+    lab4_saveoutput(R, nodecount, Time);
+*/
+    FILE* op;
+    int i;
+
+    if ((op = fopen("data_output","w")) == NULL) {
+        printf("Error opening the input file.\n");
+        return 1;
+    }
+    fprintf(op, "%d\n%f\n", nodecount, Time);
+    for (i = 0; i < nodecount; ++i )
+        fprintf(op, "%e\n", R[i]);
+    fclose(op);
+    return 0;
+}
+
+#ifdef LAB4_EXTEND
+
+int node_init(struct node **nodehead, int start, int end){
+    FILE *ip;
+    int i, nodecount;
+    int src, dst;
+    int nodeID, num_in, num_out;
+    int *index; //keep track of the outlink list storing position
+    int num_nodes = end - start;
+
+    // deal with the meta data and allocate space
+    (*nodehead) = malloc(num_nodes * sizeof(struct node));
+    if ((ip = fopen("data_input_meta","r")) == NULL) {
+        printf("Error opening the data_input_meta file.\n");
+        return -1;
+    }
+    fscanf(ip, "%d\n", &nodecount);
+    for (i=0; i<start; ++i){ // allocate to the right place
+        fscanf(ip, "%d\t%d\t%d\n", &nodeID, &num_in, &num_out);
+    }
+    for ( i = start; i < end && i < nodecount; ++i){ // handlling the dumping case
+        fscanf(ip, "%d\t%d\t%d\n", &nodeID, &num_in, &num_out);
+        if (nodeID != i){
+            printf("Error loading meta data, node id inconsistent!\n");
+            return -2;
+        }
+        (*nodehead)[i-start].num_in_links = num_in;
+        (*nodehead)[i-start].num_out_links = num_out;
+        (*nodehead)[i-start].inlinks = malloc(num_in * sizeof(int));
+    }
+    fclose(ip);
+    if (i < end){// initial the dampling nodes as well
+        for (;i<end; ++i){
+            (*nodehead)[i-start].num_in_links = 0;
+            (*nodehead)[i-start].num_out_links = nodecount;
+            (*nodehead)[i-start].inlinks = malloc(sizeof(int));
+        }
+    }
+    // Load the link informations
+    if ((ip = fopen("data_input_link","r")) == NULL) {
+        printf("Error opening the data_input_link file.\n");
+        return -3;
+    }
+    index = malloc(num_nodes * sizeof(int));
+    for(i=0; i<num_nodes; ++i){
+        index[i] = 0;
+    }
+    while(!feof(ip)){
+        fscanf(ip, "%d\t%d\n", &src, &dst);
+        if (dst >= start && dst < end)
+            (*nodehead)[dst - start].inlinks[index[dst - start]++] = src;
+    }
+    free(index);
+    fclose(ip);
+    return 0;
+}
+
+int node_destroy(struct node *nodehead, int num_nodes){
+    int i;
+    for (i = 0; i < num_nodes; ++i){
+        free(nodehead[i].inlinks);
+    }
+    free(nodehead);
+    return 0;
+}
+
+double rel_error(double *r, double *t, int size){
+    int i;
+    double norm_diff = 0, norm_vec = 0;
+    for (i = 0; i < size; ++i){
+        norm_diff += (r[i] - t[i]) * (r[i] - t[i]);
+        norm_vec += t[i] * t[i];
+    }
+    return sqrt(norm_diff/norm_vec);
+}
+
+int vec_cp(double *r, double *t, int size){
+    int i;
+    for (i = 0; i < size; ++i) t[i] = r[i];
+    return 0;
+}
+
+#endif // LAB4_EXTEND
+
+
+-------------------------------------------------------------------------------------------------------|
+Lab4_IO.h:
+/*
+Header for the Lab 4 IO functions
+Need "-lm" tag when include this header
+*/
+#ifndef LAB4_H_INCLUDE
+#define LAB4_H_INCLUDE
+
+//===========
+// Mandatory included functions
+int Lab4_saveoutput(double* R, int nodecount, double Time);
+
+//===========
+// Supporting structures and reference functions for serialtester
+// math functions
+#ifdef LAB4_EXTEND
+double rel_error(double *r, double *t, int size); // the relative between vec r and vec t with respect to t, i.e., it returns norm(r-t)/norm(t)
+int vec_cp(double *r, double *t, int size); // cp r to t
+
+// Structure to store the node info
+struct node{
+    int *inlinks;
+    int num_in_links;
+    int num_out_links;
+};
+int node_init(struct node **nodehead, int start, int end); // Load the input data for index within a range. Including the start but not including the end!
+int node_destroy(struct node *nodehead, int num_nodes);
+#endif // LAB4_EXTEND
+#endif // LAB4_H_INCLUDE
+
+
+-------------------------------------------------------------------------------------------------------|
+main.c:
+
+
+-------------------------------------------------------------------------------------------------------|
+main_template.c:
+/*
+    Serial Implementation of Lab 4
+    gcc main_template.c Lab4_IO.c -o main_template -lm
+
+*/
+
+#define LAB4_EXTEND
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include "Lab4_IO.h"
+#include "timer.h"
+
+#define EPSILON 0.00001
+#define DAMPING_FACTOR 0.85
+
+int main (int argc, char* argv[]){
+    // instantiate variables
+    struct node *nodehead;
+    int nodecount;
+    double *r, *r_pre;
+    int i, j;
+    int iterationcount;
+    double start, end;
+    FILE *ip;
+    /* INSTANTIATE MORE VARIABLES IF NECESSARY */
+
+    printf("Line 29\n");
+    // load data 
+    if ((ip = fopen("data_input_meta","r")) == NULL) {
+        printf("Error opening the data_input_meta file.\n");
+        return 253;
+    }
+    fscanf(ip, "%d\n", &nodecount);
+    fclose(ip);
+    if (node_init(&nodehead, 0, nodecount)) return 254;
+    
+    // initialize variables
+    r = malloc(nodecount * sizeof(double));
+    r_pre = malloc(nodecount * sizeof(double));
+    
+    printf("Line 43\n");
+    GET_TIME(start);
+    iterationcount = 0;
+    for ( i = 0; i < nodecount; ++i)
+        r[i] = 1.0 / nodecount;
+    /* INITIALIZE MORE VARIABLES IF NECESSARY */
+
+    printf("Line 50\n");
+    // core calculation
+    do {
+        ++iterationcount;
+        /* IMPLEMENT ITERATIVE UPDATE */
+
+    } while(rel_error(r, r_pre, nodecount) >= EPSILON);
+    GET_TIME(end);
+    printf("Line 58\n");
+
+    Lab4_saveoutput(r, nodecount, end - start);
+
+    // post processing
+    printf("Line 63\n");
+    node_destroy(nodehead, nodecount);
+    free(r); free(r_pre);
+    return 0;
+}
+
+
+-------------------------------------------------------------------------------------------------------|
+ReadMe:
+Read me for ECE 420 Lab4 Script Kit
+Mar. 2024
+
+=====
+Overview:
+    There are four groups of scripts in this kit
+    
+-----
+    Data selection program and original data:
+    web-Standford.txt	original data
+    datatrim.c          source file to fetch a subset of the original data and pre-process it
+
+-----
+    Important functions:
+    timer.h        macro definition for the time measurement
+    Lab4IO.h       header for the Lab4IO.c, needs to be included if call the IOs directly from Lab4IO.c
+    Lab4IO.c       source file for the IO functions, needs to be referred in the compiler line if the functions are called in the program
+
+-----
+    Template script:
+    main_template.c  an incomplete serial implementation provided as a template (you may ignore this script if you want)
+
+-----
+    Verification program:
+    serialtester  executable file for the testing program.
+                  to use:
+                      1. run "sha256sum serialtester" and check that the output checksum is "598471b927d0d03e1ea0623dfeaeeb560efa0bcc5e22dc8680867111df59b341"
+                      2, run "chmod +x serialtester" to grant execution permission
+                      3. run "./serialtester" to verify the results
+                      note: 
+                      - do not run the serialtester if the checksum does not match (re-download the file if necessary)
+                      - the serialtester only works on the VM (it will probably not work on your local device)
+                      - make sure that "data_input_link", "data_input_meta", and "data_output" are consistent with each other
+=====
+Please also find the detailed instructions in the comments of the individual files.
+Web Graph data is from http://snap.stanford.edu/data/web-Stanford.html
+
+
+-------------------------------------------------------------------------------------------------------|
+timer.h:
+/*
+Macro for time measuring.
+
+To use this macro, you need to declare two double type variables to store the start time and the end time. The macro GET_TIME() will return the time to the variable you put in. e.g., for your program, you need to declare two varibles first:
+double start, end;
+at where you want to record the starting time, put
+GET_TIME(start);
+at where you want to record the end time, put
+GET_TIME(end);
+Then the elapsed time would be
+end-start
+
+*/
+
+#ifndef _TIMER_H_
+#define _TIMER_H_
+
+#include <sys/time.h>
+
+#define GET_TIME(now) { \
+   struct timeval t; \
+   gettimeofday(&t, NULL); \
+   now = t.tv_sec + t.tv_usec/1000000.0; \
+}
+
+#endif
+
+

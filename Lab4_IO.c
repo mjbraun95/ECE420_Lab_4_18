@@ -7,14 +7,14 @@
 
 int Lab4_saveoutput(double *R, int nodecount, double Time){
 /*
-    Save the data to file for Lab 4 
+    Save the data to file for Lab 4
 
     -----
     Input:
-    int *R         pointer to the result array 
-    int nodecount  number of nodes 
+    int *R         pointer to the result array
+    int nodecount  number of nodes
     double Time    measured calculation time
-    
+
     -----
     Output:
     data_output the stored data
@@ -22,7 +22,7 @@ int Lab4_saveoutput(double *R, int nodecount, double Time){
     -----
     Example:
     lab4_saveoutput(R, nodecount, Time);
-*/    
+*/
     FILE* op;
     int i;
 

@@ -1,5 +1,7 @@
 /*
     Serial Implementation of Lab 4
+    gcc main_template.c Lab4_IO.c -o main_template -lm
+
 */
 
 #define LAB4_EXTEND
@@ -24,7 +26,7 @@ int main (int argc, char* argv[]){
     FILE *ip;
     /* INSTANTIATE MORE VARIABLES IF NECESSARY */
 
-    
+    printf("Line 29\n");
     // load data 
     if ((ip = fopen("data_input_meta","r")) == NULL) {
         printf("Error opening the data_input_meta file.\n");
@@ -38,23 +40,37 @@ int main (int argc, char* argv[]){
     r = malloc(nodecount * sizeof(double));
     r_pre = malloc(nodecount * sizeof(double));
     
+    printf("Line 43\n");
     GET_TIME(start);
     iterationcount = 0;
     for ( i = 0; i < nodecount; ++i)
         r[i] = 1.0 / nodecount;
     /* INITIALIZE MORE VARIABLES IF NECESSARY */
 
+    printf("Line 50\n");
     // core calculation
-    do{
-        ++iterationcount;
-        /* IMPLEMENT ITERATIVE UPDATE */
+    // Core calculation
+    do {
+        vec_cp(r, r_pre, nodecount); // Copy current PageRank scores to r_pre
 
-    }while(rel_error(r, r_pre, nodecount) >= EPSILON);
+        for (i = 0; i < nodecount; ++i) {
+            double sum = 0;
+            for (j = 0; j < nodehead[i].num_in_links; ++j) {
+                int inlink_node_index = nodehead[i].inlinks[j];
+                sum += r_pre[inlink_node_index] / nodehead[inlink_node_index].num_out_links;
+            }
+            r[i] = (1 - DAMPING_FACTOR) / nodecount + DAMPING_FACTOR * sum;
+        }
+
+        ++iterationcount;
+    } while (rel_error(r, r_pre, nodecount) >= EPSILON);
     GET_TIME(end);
+    printf("Line 58\n");
 
     Lab4_saveoutput(r, nodecount, end - start);
 
     // post processing
+    printf("Line 63\n");
     node_destroy(nodehead, nodecount);
     free(r); free(r_pre);
     return 0;
