@@ -1,3 +1,8 @@
+/*
+    MPI Implementation of Lab 4
+    mpicc main.c Lab4_IO.c -o main -lm
+
+*/
 #define LAB4_EXTEND
 #include "Lab4_IO.h"
 #include <mpi.h>
@@ -14,7 +19,7 @@ int main(int argc, char* argv[]) {
     int world_rank, world_size, nodecount;
     struct node* nodehead;
     double* r, *r_pre, *r_global;
-    int i, j;
+    int i, j, local_n_count;
     double start, end;
     int* recvcounts, *displs;
     int iteration_count = 0;
@@ -23,14 +28,24 @@ int main(int argc, char* argv[]) {
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 
-    // Load graph and broadcast nodecount
+    // Broadcast the node count from the master process to all other processes
     if (world_rank == 0) {
-        if ((node_init(&nodehead, 0, nodecount)) != 0) {
-            printf("Failed to initialize nodes.\n");
+        FILE* ip;
+        if ((ip = fopen("data_input_meta", "r")) == NULL) {
+            printf("Error opening the data_input_meta file.\n");
             MPI_Abort(MPI_COMM_WORLD, 1);
         }
+        fscanf(ip, "%d", &nodecount);
+        fclose(ip);
     }
+    
+    // Broadcast the nodecount to all processes
     MPI_Bcast(&nodecount, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    // Initialize nodehead with the correct nodecount
+    if (node_init(&nodehead, 0, nodecount) != 0) {
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
 
     // Allocation for PageRank vectors
     r = (double*)malloc(nodecount * sizeof(double));
@@ -50,11 +65,9 @@ int main(int argc, char* argv[]) {
     int local_start = world_rank * chunk + (world_rank < remainder ? world_rank : remainder);
     int local_end = local_start + chunk + (world_rank < remainder);
 
-    // Collect information on the number of elements each process will send
-    int local_n_count = local_end - local_start;
+    local_n_count = local_end - local_start;
     MPI_Allgather(&local_n_count, 1, MPI_INT, recvcounts, 1, MPI_INT, MPI_COMM_WORLD);
 
-    // Calculate displacements
     displs[0] = 0;
     for (i = 1; i < world_size; ++i) {
         displs[i] = displs[i - 1] + recvcounts[i - 1];
@@ -73,18 +86,15 @@ int main(int argc, char* argv[]) {
             r[i] = (1.0 - DAMPING_FACTOR) / nodecount + DAMPING_FACTOR * sum;
         }
 
-        // Gather all partial PageRank vectors to all processes using MPI_Allgatherv
         MPI_Allgatherv(r + local_start, local_n_count, MPI_DOUBLE,
                        r_global, recvcounts, displs, MPI_DOUBLE, MPI_COMM_WORLD);
 
-        // Copy global results back to local r for next iteration
         vec_cp(r_global, r, nodecount);
 
         iteration_count++;
     } while (rel_error(r, r_pre, nodecount) >= EPSILON && iteration_count < MAX_ITER);
     GET_TIME(end);
 
-    // Save output and clean up in the master process
     if (world_rank == 0) {
         Lab4_saveoutput(r, nodecount, end - start);
     }
@@ -94,6 +104,7 @@ int main(int argc, char* argv[]) {
     free(r_global);
     free(recvcounts);
     free(displs);
+    free(nodehead); // Freeing the nodehead after use
     MPI_Finalize();
     return 0;
 }
