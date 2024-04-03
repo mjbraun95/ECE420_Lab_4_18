@@ -1,7 +1,7 @@
 /*
     MPI Implementation of Lab 4
     mpicc main.c Lab4_IO.c -o main -lm
-
+    mpirun -np 4 -f ~/hosts ./main
 */
 #define LAB4_EXTEND
 #include "Lab4_IO.h"
@@ -28,44 +28,48 @@ int main(int argc, char* argv[]) {
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 
+    // Debug: Confirm start of each process
+    // printf("Process %d started\n", world_rank);
+    fflush(stdout);
+
     // Broadcast the node count from the master process to all other processes
     if (world_rank == 0) {
         FILE* ip;
         if ((ip = fopen("data_input_meta", "r")) == NULL) {
-            printf("Error opening the data_input_meta file.\n");
+            // printf("Error opening the data_input_meta file.\n");
             MPI_Abort(MPI_COMM_WORLD, 1);
         }
         fscanf(ip, "%d", &nodecount);
         fclose(ip);
     }
     
-    // Broadcast the nodecount to all processes
     MPI_Bcast(&nodecount, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    // printf("Process %d received nodecount %d\n", world_rank, nodecount);
+    fflush(stdout);
 
-    // Initialize nodehead with the correct nodecount
     if (node_init(&nodehead, 0, nodecount) != 0) {
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
-    // Allocation for PageRank vectors
     r = (double*)malloc(nodecount * sizeof(double));
     r_pre = (double*)malloc(nodecount * sizeof(double));
     r_global = (double*)malloc(nodecount * sizeof(double));
     recvcounts = (int*)malloc(world_size * sizeof(int));
     displs = (int*)malloc(world_size * sizeof(int));
 
-    // Initialize PageRank values
     for (i = 0; i < nodecount; ++i) {
         r[i] = 1.0 / nodecount;
     }
 
-    // Determine local work range
     int chunk = nodecount / world_size;
     int remainder = nodecount % world_size;
     int local_start = world_rank * chunk + (world_rank < remainder ? world_rank : remainder);
     int local_end = local_start + chunk + (world_rank < remainder);
-
     local_n_count = local_end - local_start;
+
+    // printf("Process %d handling nodes from %d to %d\n", world_rank, local_start, local_end - 1);
+    fflush(stdout);
+
     MPI_Allgather(&local_n_count, 1, MPI_INT, recvcounts, 1, MPI_INT, MPI_COMM_WORLD);
 
     displs[0] = 0;
@@ -89,7 +93,15 @@ int main(int argc, char* argv[]) {
         MPI_Allgatherv(r + local_start, local_n_count, MPI_DOUBLE,
                        r_global, recvcounts, displs, MPI_DOUBLE, MPI_COMM_WORLD);
 
+        // Debug: Check the integrity of r_global in all processes
+        if (iteration_count == 1) {
+            // printf("Process %d, Sample r_global[0]: %f, r_global[%d]: %f\n", world_rank, r_global[0], nodecount-1, r_global[nodecount-1]);
+            fflush(stdout);
+        }
+
         vec_cp(r_global, r, nodecount);
+        // printf("Process %d, Iteration %d, Relative Error: %f\n", world_rank, iteration_count, rel_error(r, r_pre, nodecount));
+        fflush(stdout);
 
         iteration_count++;
     } while (rel_error(r, r_pre, nodecount) >= EPSILON && iteration_count < MAX_ITER);
@@ -104,7 +116,7 @@ int main(int argc, char* argv[]) {
     free(r_global);
     free(recvcounts);
     free(displs);
-    free(nodehead); // Freeing the nodehead after use
+    node_destroy(nodehead, nodecount); // Freeing the nodehead after use
     MPI_Finalize();
     return 0;
 }
