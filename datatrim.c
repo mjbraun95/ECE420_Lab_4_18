@@ -6,6 +6,8 @@ As for the output file, first line is the number of the included nodes, the foll
 -----
 Compiling:
     > gcc datatrim.c -o datatrim
+    > ./datatrim
+    > ./datatrim -b 30000
 
 -----
 Synopsis:

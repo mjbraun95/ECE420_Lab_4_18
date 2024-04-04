@@ -1,1 +1,100 @@
-Does the serialtester work for MPI programs too?
+mpirun -np 1 -f ~/hosts ./main
+19437
+21.122024
+./serialtester
+The relative error against the reference result is 1.142764e-07 .
+Congratulations! Your result is correct!
+
+mpirun -np 2 -f ~/hosts ./main
+19437
+10.554122
+./serialtester
+The relative error against the reference result is 1.142764e-07 .
+Congratulations! Your result is correct!
+
+mpirun -np 4 -f ~/hosts ./main
+19437
+4.523494
+
+./serialtester
+The relative error against the reference result is 9.771623e-01 .
+Sorry. Your result is wrong.
+
+mpirun -np 8 -f ~/hosts ./main
+19437
+3.452619
+./serialtester
+The relative error against the reference result is 8.403486e-01 .
+Sorry. Your result is wrong.
+
+mpirun -np 16 -f ~/hosts ./main
+19437
+7.289602
+./serialtester
+The relative error against the reference result is 5.239969e-01 .
+Sorry. Your result is wrong.
+
+mpirun -np 11 -f ~/hosts ./main
+19437
+13.575621
+./serialtester
+The relative error against the reference result is 9.753073e-01 .
+Sorry. Your result is wrong.
+
+mpirun -np 3 -f ~/hosts ./main
+19437
+7.550197
+./serialtester
+The relative error against the reference result is 3.613855e-01 .
+Sorry. Your result is wrong.
+
+------------------------------------------
+
+mpirun -np 1 --hostfile ~/hosts ./main
+19437
+21.284199
+./serialtester
+The relative error against the reference result is 1.142764e-07 .
+Congratulations! Your result is correct!
+
+mpirun -np 2 --hostfile ~/hosts ./main
+19437
+10.806163
+./serialtester
+The relative error against the reference result is 1.142764e-07 .
+Congratulations! Your result is correct!
+
+mpirun -np 4 --hostfile ~/hosts ./main
+19437
+5.968876
+./serialtester
+The relative error against the reference result is 1.142764e-07 .
+Congratulations! Your result is correct!
+
+mpirun -np 8 --hostfile ~/hosts ./main
+19437
+7.489294
+./serialtester
+The relative error against the reference result is 1.142764e-07 .
+Congratulations! Your result is correct!
+
+mpirun -np 16 --hostfile ~/hosts ./main
+19437
+11.235478
+./serialtester
+The relative error against the reference result is 1.142764e-07 .
+Congratulations! Your result is correct!
+
+mpirun -np 11 --hostfile ~/hosts ./main
+19437
+16.222412
+./serialtester
+The relative error against the reference result is 1.142764e-07 .
+Congratulations! Your result is correct!
+
+mpirun -np 3 --hostfile ~/hosts ./main
+19437
+7.707155
+./serialtester
+The relative error against the reference result is 1.142764e-07 .
+Congratulations! Your result is correct!
